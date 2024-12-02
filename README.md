@@ -10,4 +10,4 @@ This Shiny app allows users to view and analyze stock data using interactive vis
 
 ## Access the App
 Click the link below to run the app:
-[Shiny Stock Data Viewer](https://your_shinyapps_username.shinyapps.io/app16)
+[Shiny Stock Data Viewer](https://sinhuel.shinyapps.io/app16)
