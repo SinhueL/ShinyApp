@@ -1,0 +1,149 @@
+# Task 4: Shiny App Development
+
+library(shiny)
+library(shinydashboard)
+library(tidyverse)
+library(plotly)
+library(palmerpenguins)
+
+# Ensure we have preprocessed data
+source("penguin-preprocessing-corrected.R")
+
+# Use the cleaned penguins data
+penguins_data <- penguins_cleaned
+
+# Perform PCA and Clustering (similar to previous script)
+numerical_data <- penguins_data %>%
+  select(bill_length_mm, bill_depth_mm, flipper_length_mm, body_mass_g)
+numerical_data_scaled <- scale(numerical_data)
+pca_result <- prcomp(numerical_data_scaled, center = TRUE, scale. = TRUE)
+kmeans_result <- kmeans(numerical_data_scaled, centers = 3)
+
+ui <- dashboardPage(
+  dashboardHeader(title = "Palmer Penguins Explorer"),
+  dashboardSidebar(
+    sidebarMenu(
+      menuItem("Data Filters", tabName = "filters", icon = icon("filter")),
+      menuItem("Exploratory Analysis", tabName = "exploration", icon = icon("chart-bar")),
+      menuItem("PCA & Clustering", tabName = "pca", icon = icon("chart-pie")),
+      menuItem("Model Comparison", tabName = "models", icon = icon("calculator"))
+    )
+  ),
+  dashboardBody(
+    tabItems(
+      # Filters Tab
+      tabItem(
+        tabName = "filters",
+        box(
+          selectInput("species_filter", "Select Species", 
+                      choices = unique(penguins_data$species),
+                      multiple = TRUE, 
+                      selected = unique(penguins_data$species)),
+          selectInput("island_filter", "Select Island", 
+                      choices = unique(penguins_data$island),
+                      multiple = TRUE, 
+                      selected = unique(penguins_data$island)),
+          selectInput("sex_filter", "Select Sex", 
+                      choices = unique(penguins_data$sex),
+                      multiple = TRUE, 
+                      selected = unique(penguins_data$sex))
+        )
+      ),
+      
+      # Exploratory Analysis Tab
+      tabItem(
+        tabName = "exploration",
+        fluidRow(
+          box(
+            title = "Scatter Plot", 
+            plotlyOutput("scatter_plot")
+          ),
+          box(
+            title = "Box Plot", 
+            plotlyOutput("box_plot")
+          )
+        )
+      ),
+      
+      # PCA & Clustering Tab
+      tabItem(
+        tabName = "pca",
+        fluidRow(
+          box(
+            title = "PCA Variance Explained", 
+            plotOutput("pca_scree_plot")
+          ),
+          box(
+            title = "Clustering Visualization", 
+            plotOutput("cluster_plot")
+          )
+        )
+      ),
+      
+      # Model Comparison Tab
+      tabItem(
+        tabName = "models",
+        box(
+          title = "Model Comparison Table",
+          dataTableOutput("model_comparison")
+        )
+      )
+    )
+  )
+)
+
+server <- function(input, output, session) {
+  # Reactive filtered data
+  filtered_data <- reactive({
+    penguins_data %>%
+      filter(
+        species %in% input$species_filter,
+        island %in% input$island_filter,
+        sex %in% input$sex_filter
+      )
+  })
+  
+  # Scatter Plot
+  output$scatter_plot <- renderPlotly({
+    ggplotly(
+      ggplot(filtered_data(), aes(x = bill_length_mm, y = body_mass_g, color = species)) +
+        geom_point() +
+        theme_minimal()
+    )
+  })
+  
+  # Box Plot
+  output$box_plot <- renderPlotly({
+    ggplotly(
+      filtered_data() %>%
+        pivot_longer(cols = c(bill_length_mm, body_mass_g), names_to = "variable", values_to = "value") %>%
+        ggplot(aes(x = species, y = value, fill = species)) +
+        geom_boxplot() +
+        facet_wrap(~variable, scales = "free_y") +
+        theme_minimal()
+    )
+  })
+  
+  # PCA Scree Plot
+  output$pca_scree_plot <- renderPlot({
+    fviz_eig(pca_result)
+  })
+  
+  # Clustering Plot
+  output$cluster_plot <- renderPlot({
+    fviz_cluster(kmeans_result, data = numerical_data_scaled)
+  })
+  
+  # Model Comparison Table
+  output$model_comparison <- renderDataTable({
+    # In a real scenario, you'd load your model comparison results here
+    data.frame(
+      Model = c("Bill Length", "Bill Depth", "Flipper Length"),
+      AdjustedRSquared = c(0.5, 0.4, 0.3),
+      AIC = c(100, 110, 120),
+      BIC = c(105, 115, 125)
+    )
+  })
+}
+
+shinyApp(ui, server)
